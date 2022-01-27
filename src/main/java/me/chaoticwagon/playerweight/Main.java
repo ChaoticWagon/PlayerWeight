@@ -5,7 +5,7 @@ import me.chaoticwagon.playerweight.Commands.getWeight;
 import me.chaoticwagon.playerweight.Commands.setItemWeight;
 import me.chaoticwagon.playerweight.Commands.setMaxWeight;
 import me.chaoticwagon.playerweight.Listeners.*;
-import org.bukkit.Bukkit;
+import org.bukkit.attribute.Attribute;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
@@ -16,9 +16,6 @@ import java.util.Map;
 import java.util.UUID;
 
 public final class Main extends JavaPlugin {
-
-
-    public BossBarSetup bar;
 
     @Override
     public void onEnable() {
@@ -38,19 +35,15 @@ public final class Main extends JavaPlugin {
         getServer().getPluginManager().registerEvents(new PlayerWalk(this),this);
 
 
-        if (Bukkit.getOnlinePlayers().size() > 0)
-            for (Player player : Bukkit.getOnlinePlayers()){
-                bar = new BossBarSetup(this, player);
-                bar.createBar();
-                bar.addPlayer(player);
-            }
-
         BukkitScheduler scheduler = getServer().getScheduler();
         scheduler.scheduleSyncRepeatingTask(this, new Runnable() {
             @Override
             public void run() {
                for (Player p : getServer().getOnlinePlayers()){
                    currentWeight.put(p.getUniqueId(),getPlayerWeight(p));
+                   if (calculateSpeed(p) != -1){
+                       p.getAttribute(Attribute.GENERIC_MOVEMENT_SPEED).setBaseValue(calculateSpeed(p));
+                   }
                }
             }
         },0L, 20L);
@@ -58,7 +51,7 @@ public final class Main extends JavaPlugin {
 
     @Override
     public void onDisable() {
-        bar.getBar().removeAll();
+        // Plugin shutdown logic
     }
     public Map<UUID,Integer> currentWeight = new HashMap<UUID,Integer>();
     public Map<UUID,Integer> maxWeight = new HashMap<UUID, Integer>();
@@ -121,5 +114,34 @@ public final class Main extends JavaPlugin {
         }
         return  true;
     }
+
+    public float calculateSpeed(Player p){
+        //Returns -1 if there is no speed decrease
+        float speed;
+        int currentWeight = this.currentWeight.get(p.getUniqueId());
+        int maxWeight = this.maxWeight.get(p.getUniqueId());
+        int decreaseStart = this.getConfig().getInt("Speed-decrease-start");
+        int maxDecrease = this.getConfig().getInt("Maximum-speed-decrease");
+
+        //subtract the decreaseStart from the max weight and current weight, then divide the 2 values
+
+        if (decreaseStart <= -1) return -1;
+        if (maxDecrease <= 0) return -1;
+        if (currentWeight <= 0) return -1;
+        if (currentWeight - decreaseStart <= 0) return -1;
+
+        //the percentage that the player is over their max weight
+        float overDecreaseStart = ((float) currentWeight - (float) decreaseStart) / ((float) maxWeight - (float) decreaseStart);
+
+        if (overDecreaseStart * 100 > maxDecrease) {
+            speed = (float) maxDecrease / 100;
+            return speed;
+        }
+
+        speed = .2F / overDecreaseStart;
+        return speed;
+
+    }
+
 
 }
